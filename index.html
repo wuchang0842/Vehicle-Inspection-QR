@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101729">
+<title>Apartment Access Codes</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f4f5f7;color:#172033;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+header{background:#101729;color:#fff;padding:30px 26px 26px}
+h1{font-size:27px;line-height:1.12;letter-spacing:-.7px;margin:0 0 12px}
+.subtitle{color:#bfc6d4;font-size:15px;margin:0 0 24px}
+.actions{display:grid;grid-template-columns:1fr 120px;gap:12px}
+.actions button{border:0;border-radius:17px;padding:16px 10px;font-size:16px;font-weight:800}
+#locate{background:#fff;color:#172033}#mapToggle{background:#344056;color:#fff}
+main{max-width:1100px;margin:auto;padding:32px 20px 40px}
+.notice{background:#fff7eb;color:#98482e;border-radius:18px;padding:18px;margin-bottom:14px;line-height:1.35}
+.searchbox{position:relative;z-index:5000}
+#search{width:100%;padding:17px 19px;border:2px solid #dedfe3;border-radius:19px;background:#fff;font-size:19px;outline:none}
+#search:focus{border-color:#8da7df}
+#suggestions{display:none;position:absolute;left:0;right:0;top:62px;background:#fff;border:1px solid #dfe2e8;border-radius:0 0 18px 18px;overflow:hidden;box-shadow:0 12px 30px #17203324}
+.suggestion{display:block;width:100%;padding:13px 16px;text-align:left;border:0;border-bottom:1px solid #edf0f4;background:#fff;color:#172033;font-size:14px}
+.suggestion small{display:block;color:#267448;font-weight:800;margin-top:4px}
+.summary{font-size:20px;color:#687080;margin:27px 3px 22px}
+#map{height:430px;border-radius:20px;overflow:hidden;border:1px solid #d9dde5;position:relative;z-index:1}
+.status{font-size:12px;color:#7a8290;margin:9px 2px 22px}
+.cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.card{background:#fff;border:1px solid #e1e4ea;border-radius:16px;padding:14px;box-shadow:0 2px 6px #1720330a;cursor:pointer}
+.area{font-size:10px;text-transform:uppercase;letter-spacing:.6px;font-weight:800;color:#6e8a75;margin-bottom:5px}
+.address{font-size:14px;font-weight:800;line-height:1.35;margin:0}
+.code{display:inline-block;background:#edf7ef;color:#22643c;border-radius:9px;padding:7px 9px;font-size:13px;font-weight:800;margin-top:10px;overflow-wrap:anywhere}
+.distance{font-size:12px;color:#7a8290;margin-top:9px}
+.empty{grid-column:1/-1;text-align:center;background:#fff;padding:30px;border-radius:16px;color:#7a8290}
+
+@media(max-width:600px){header{padding:30px 26px 26px}main{padding:32px 20px}#map{height:430px}.cards{gap:9px}.card{padding:12px}.address{font-size:13px}.code{font-size:12px;padding:6px 7px}}
+</style>
+</head>
+<body>
+<header>
+<h1>🏢 Apartment Access Codes</h1>
+<p class="subtitle">Search addresses or codes · nearby apartments first</p>
+<div class="actions"><button id="locate">📍 Find nearby</button><button id="mapToggle">🗺️ Map</button></div>
+</header>
+<main>
+<div class="notice">Access codes are sensitive. Share this page only with trusted colleagues.</div>
+<div class="searchbox">
+<input id="search" type="search" autocomplete="off" placeholder="Search address or code…">
+<div id="suggestions"></div>
+</div>
+<div class="summary"><span id="count">37</span> apartments</div>
+<div id="map"></div>
+<div class="status" id="status">Loading saved map locations…</div><button id="retryGeo" class="retry" style="display:none">↻ Retry missing map locations</button>
+<section class="cards" id="cards"></section>
+</main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const APARTMENTS=[{"area":"Brunswick","address":"10 Donald Street, Brunswick VIC","code":"2511"},{"area":"Brunswick","address":"10 Pottery Court, Brunswick VIC","code":"6415"},{"area":"Brunswick","address":"100 Blyth Street, Brunswick VIC","code":"2789"},{"area":"Brunswick","address":"12-32 Lux Way, Brunswick VIC","code":"Key2306"},{"area":"Brunswick","address":"2-6 Duckett Street, Brunswick VIC","code":"#2680#"},{"area":"Brunswick","address":"2 Black Street, Brunswick VIC","code":"Bell8116bell"},{"area":"Brunswick","address":"212 Albion Street, Brunswick VIC","code":"742579#"},{"area":"Brunswick","address":"285 Brunswick Road, Brunswick VIC","code":"14580"},{"area":"Brunswick","address":"287 Brunswick Road, Brunswick VIC","code":"#1206 #2613"},{"area":"Brunswick","address":"40-52 Percy Street, Brunswick VIC","code":"key0491"},{"area":"Brunswick","address":"4 Saxon Street, Brunswick VIC","code":"2608"},{"area":"Brunswick","address":"54-84 Percy Street, Brunswick VIC","code":"key9184"},{"area":"Brunswick","address":"55 De Carle Street, Brunswick VIC","code":"3579"},{"area":"Brunswick","address":"6 Black Street, Brunswick VIC","code":"8047#"},{"area":"Brunswick","address":"7 Colebrook Street, Brunswick VIC","code":"key2105"},{"area":"Brunswick","address":"74 De Carle Street, Brunswick VIC","code":"o,0852"},{"area":"Brunswick","address":"767 High Street, Brunswick VIC","code":"#2204"},{"area":"Brunswick","address":"8-38 Percy Street, Brunswick VIC","code":"key2794"},{"area":"Brunswick","address":"98 Moreland Road, Brunswick VIC","code":"C2389Z"},{"area":"Brunswick East","address":"116 Albert Street, Brunswick East VIC","code":"#1874#"},{"area":"Brunswick East","address":"133 Nicholson Street, Brunswick East VIC","code":"#1111"},{"area":"Brunswick East","address":"162-164 Lygon Street, Brunswick East VIC","code":"483164"},{"area":"Brunswick East","address":"240-250 Lygon Street, Brunswick East VIC","code":"#888888#"},{"area":"Brunswick East","address":"269 Stewart Street, Brunswick East VIC","code":"#269269"},{"area":"Brunswick East","address":"38 Hutchinson Street, Brunswick East VIC","code":"22106"},{"area":"Brunswick East","address":"394 Lygon Street, Brunswick East VIC","code":"#3944#"},{"area":"Brunswick East","address":"455 Lygon Street, Brunswick East VIC","code":"#9648"},{"area":"Brunswick East","address":"791-793 Park Street, Brunswick East VIC","code":"5690"},{"area":"Brunswick East","address":"9 Holmes Street, Brunswick East VIC","code":"2580"},{"area":"Brunswick West","address":"14 Irvine Crescent, Brunswick West VIC","code":"C289"},{"area":"Coburg","address":"15-17 De Carle Street, Coburg VIC","code":"313313#"},{"area":"Coburg","address":"183 Moreland Road, Coburg VIC","code":"1956#"},{"area":"Coburg","address":"23 Baxter Street, Coburg VIC","code":"C7625 sml gate"},{"area":"Coburg","address":"37-41 Munro Street, Coburg VIC","code":"#3204"},{"area":"Coburg","address":"5 Industry Lane, Coburg VIC","code":".8503"},{"area":"Coburg","address":"56 Sydney Road, Coburg VIC","code":"8895"},{"area":"Coburg","address":"6 Industry Lane, Coburg VIC","code":".8503"},{"area":"Coburg","address":"1 Industry Lane, Coburg VIC","code":".8503"},{"area":"Coburg","address":"95 Harding Street, Coburg VIC","code":"C1845"},{"area":"Carlton","address":"150 Station Street, Carlton VIC","code":"*3797  2990#"},{"area":"Carlton","address":"188 Faraday Street, Carlton VIC","code":"2973"},{"area":"Carlton","address":"22-26 Grattan Street, Carlton VIC","code":"*8319"},{"area":"Carlton","address":"255 Cardigan Street, Carlton VIC","code":"*4444"},{"area":"Carlton","address":"259-277 Nicholson Street, Carlton VIC","code":"7479#"},{"area":"Carlton","address":"371 Drummond Street, Carlton VIC","code":"*2680"},{"area":"Carlton","address":"404 Cardigan Street, Carlton VIC","code":"cz05x"},{"area":"Carlton","address":"93 Pelham Street, Carlton VIC","code":"1940"},{"area":"Carlton North","address":"767 Nicholson Street, Carlton North VIC","code":"0767"},{"area":"Fitzroy","address":"1 James Street, Fitzroy VIC","code":"1987 1091"},{"area":"Fitzroy","address":"113 Cecil Street, Fitzroy VIC","code":"3110"},{"area":"Fitzroy","address":"143-149 Kerr Street, Fitzroy VIC","code":"*1009"},{"area":"Fitzroy","address":"166 Gertrude Street, Fitzroy VIC","code":"395332#"},{"area":"Fitzroy","address":"185 Rose Street, Fitzroy VIC","code":"intercom side button"},{"area":"Fitzroy","address":"205 Johnston Street, Fitzroy VIC","code":"6388"},{"area":"Fitzroy","address":"220 Johnson Street, Fitzroy VIC","code":"#221122#"},{"area":"Fitzroy","address":"226-228 Moor Street, Fitzroy VIC","code":"*3671*"},{"area":"Fitzroy","address":"26 Victoria Street, Fitzroy VIC","code":"2732 4591 2591"},{"area":"Fitzroy","address":"385 Gore Street, Fitzroy VIC","code":"174392"},{"area":"Fitzroy","address":"424 Gore Street, Fitzroy VIC","code":"intercom side button"},{"area":"Fitzroy","address":"59 Young Street, Fitzroy VIC","code":"2504"},{"area":"Fitzroy","address":"59 Moore Street, Fitzroy VIC","code":"4687"},{"area":"Fitzroy","address":"81 Argyle Street, Fitzroy VIC","code":"1458"},{"area":"Fitzroy","address":"82 Wesgarth Street, Fitzroy VIC","code":"*828282"},{"area":"Fitzroy North","address":"135 Rae Street, Fitzroy North VIC","code":"*2426"},{"area":"Fitzroy North","address":"16 Nicholson Street, Fitzroy North VIC","code":"key8008"},{"area":"Fitzroy North","address":"247 McKean Street, Fitzroy North VIC","code":"3873 turn left"},{"area":"Fitzroy North","address":"42 Barkly Street, Fitzroy North VIC","code":"2404"}];
+let user=null,mapShown=true,userMarker=null;
+const $=id=>document.getElementById(id);
+const map=L.map('map').setView([-37.765,144.965],13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(map);
+const markers=L.layerGroup().addTo(map);
+const esc=v=>String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const text=a=>(a.area+' '+a.address+' '+a.code).toLowerCase();
+const distance=(a,b,c,d)=>{const R=6371,p=Math.PI/180,x=.5-Math.cos((c-a)*p)/2+Math.cos(a*p)*Math.cos(c*p)*(1-Math.cos((d-b)*p))/2;return 2*R*Math.asin(Math.sqrt(x))};
+const formatDistance=k=>k==null?'':k<1?Math.round(k*1000)+' m':k.toFixed(1)+' km';
+
+function render(){
+ let q=$('search').value.trim().toLowerCase();
+ let list=APARTMENTS.filter(a=>text(a).includes(q));
+ if(user)list.sort((a,b)=>(a.distance??99999)-(b.distance??99999));
+ $('count').textContent=list.length;
+ $('cards').innerHTML=list.length?list.map(a=>`<article class="card" data-address="${esc(a.address)}"><div class="area">${esc(a.area)}</div><h2 class="address">${esc(a.address)}</h2><span class="code">${esc(a.code)}</span>${a.distance!=null?`<div class="distance">${formatDistance(a.distance)} away</div>`:''}</article>`).join(''):'<div class="empty">No matching apartments found.</div>';
+ $('cards').querySelectorAll('.card').forEach(c=>c.onclick=()=>focusApartment(c.dataset.address));
+}
+
+function popup(a){return `<b>${esc(a.address)}</b><div style="color:#267448;font-weight:800;margin-top:5px">${esc(a.code)}</div>`}
+
+function drawMarkers(){
+ markers.clearLayers();
+ const bounds=[];
+ APARTMENTS.forEach(a=>{
+   if(typeof a.lat!=='number'||typeof a.lng!=='number')return;
+   const m=L.marker([a.lat,a.lng]).addTo(markers).bindPopup(popup(a));
+   m._apt=a;
+   bounds.push([a.lat,a.lng]);
+ });
+ if(bounds.length&&!user)map.fitBounds(bounds,{padding:[20,20]});
+}
+
+function focusApartment(address){
+ const a=APARTMENTS.find(x=>x.address===address);
+ if(!a||typeof a.lat!=='number')return;
+ map.setView([a.lat,a.lng],16);
+ markers.eachLayer(m=>{if(m._apt===a)m.openPopup()});
+}
+
+function suggestions(){
+ const q=$('search').value.trim().toLowerCase(),box=$('suggestions');
+ if(!q){box.style.display='none';box.innerHTML='';return}
+ const list=APARTMENTS.filter(a=>text(a).includes(q)).slice(0,8);
+ box.innerHTML=list.map(a=>`<button class="suggestion" data-address="${esc(a.address)}">${esc(a.address)}<small>${esc(a.code)}</small></button>`).join('');
+ box.style.display=list.length?'block':'none';
+ box.querySelectorAll('button').forEach(b=>b.onclick=()=>{$('search').value=b.dataset.address;box.style.display='none';render();focusApartment(b.dataset.address)});
+}
+
+const GEO_CACHE_KEY='apartmentAccessGeo_v3';
+let geoCache={};
+try{geoCache=JSON.parse(localStorage.getItem(GEO_CACHE_KEY)||'{}')||{};}catch(e){geoCache={};}
+function geoKey(address){return String(address).trim().toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();}
+function sleep(ms){return new Promise(resolve=>setTimeout(resolve,ms));}
+function saveGeo(a){
+  if(typeof a.lat!=='number'||typeof a.lng!=='number')return;
+  geoCache[geoKey(a.address)]={lat:a.lat,lng:a.lng};
+  try{localStorage.setItem(GEO_CACHE_KEY,JSON.stringify(geoCache));}catch(e){console.warn('Could not save map cache',e);}
+}
+function applyGeoCache(){
+  let ok=0;
+  APARTMENTS.forEach(a=>{
+    const c=geoCache[geoKey(a.address)];
+    if(c&&Number.isFinite(Number(c.lat))&&Number.isFinite(Number(c.lng))){
+      a.lat=Number(c.lat);a.lng=Number(c.lng);ok++;
+    }
+  });
+  return ok;
+}
+function pickGeoResult(a,results){
+  if(!Array.isArray(results)||!results.length)return null;
+  const wanted=(a.address||'').toLowerCase();
+  const scored=results.map(r=>{
+    const name=((r.display_name||'')+'').toLowerCase();
+    let score=0;
+    if(name.includes('victoria'))score+=2;
+    if(name.includes('australia'))score+=2;
+    const num=(wanted.match(/^\s*([0-9]+)/)||[])[1];
+    if(num&&name.includes(num+' '))score+=4;
+    const street=(wanted.match(/^\s*[0-9]+(?:-[0-9]+)?\s+(.+?)(?:,|\s+vic)/i)||[])[1];
+    if(street){
+      const first=street.trim().split(/\s+/).slice(0,2).join(' ');
+      if(first&&name.includes(first))score+=4;
+    }
+    if(r.type==='house')score+=3;
+    if(r.class==='place')score+=1;
+    return {r,score};
+  }).sort((x,y)=>y.score-x.score);
+  const best=scored[0]?.r;
+  if(!best||!Number.isFinite(Number(best.lat))||!Number.isFinite(Number(best.lon)))return null;
+  return best;
+}
+
+async function geocodeAll(onlyMissing=false){
+ let ok=applyGeoCache();
+ drawMarkers();
+ $('status').textContent=ok+'/'+APARTMENTS.length+' map locations ready · checking missing addresses…';
+ const missing=APARTMENTS.filter(a=>typeof a.lat!=='number'||typeof a.lng!=='number');
+ for(let i=0;i<missing.length;i++){
+  const a=missing[i];
+  let found=null;
+  for(let attempt=0;attempt<3&&!found;attempt++){
+   try{
+    const q=attempt===0?a.address:a.address+', Australia';
+    const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=5&countrycodes=au&addressdetails=1&q='+encodeURIComponent(q),{headers:{'Accept-Language':'en'}});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    found=pickGeoResult(a,d);
+   }catch(e){console.warn('Geocoding attempt failed',a.address,e)}
+   if(!found&&attempt<2)await sleep(1600);
+  }
+  if(found){
+   a.lat=Number(found.lat);a.lng=Number(found.lon);
+   saveGeo(a);ok++;drawMarkers();
+  }
+  $('status').textContent=ok+'/'+APARTMENTS.length+' map locations ready · '+(APARTMENTS.length-ok)+' remaining';
+  if(i<missing.length-1)await sleep(1100);
+ }
+ const left=APARTMENTS.filter(a=>typeof a.lat!=='number'||typeof a.lng!=='number');
+ if(left.length){
+   $('status').textContent=ok+'/'+APARTMENTS.length+' map locations ready · '+left.length+' need a map check';
+   $('retryGeo').style.display='inline-block';
+ }else{
+   $('status').textContent=ok+'/'+APARTMENTS.length+' map locations loaded. Tap a blue marker to see the address and access code.';
+   $('retryGeo').style.display='none';
+ }
+}
+
+function locate(){
+ if(!navigator.geolocation){alert('Location is not supported by this browser.');return}
+ $('locate').textContent='📍 Locating…';
+ navigator.geolocation.getCurrentPosition(p=>{
+   user={lat:p.coords.latitude,lng:p.coords.longitude};
+   APARTMENTS.forEach(a=>a.distance=typeof a.lat==='number'?distance(user.lat,user.lng,a.lat,a.lng):null);
+   if(userMarker)map.removeLayer(userMarker);
+   userMarker=L.circleMarker([user.lat,user.lng],{radius:9,color:'#1769d1',fillColor:'#3b91ff',fillOpacity:.9}).addTo(map).bindPopup('You are here');
+   map.setView([user.lat,user.lng],14);
+   render();
+   $('locate').textContent='📍 Nearby first';
+ },()=>{ $('locate').textContent='📍 Find nearby';alert('Please allow location access in browser settings.')},{enableHighAccuracy:true,timeout:10000});
+}
+
+$('search').addEventListener('input',()=>{suggestions();render()});
+$('search').addEventListener('focus',suggestions);
+document.addEventListener('click',e=>{if(!e.target.closest('.searchbox'))$('suggestions').style.display='none'});
+$('locate').onclick=locate;
+$('retryGeo').onclick=()=>{ $('retryGeo').style.display='none'; geocodeAll(true); };
+$('mapToggle').onclick=()=>{mapShown=!mapShown;$('map').style.display=mapShown?'block':'none';$('mapToggle').textContent=mapShown?'🗺️ Map':'🗺️ Show map';if(mapShown)setTimeout(()=>map.invalidateSize(),100)};
+render();drawMarkers();geocodeAll();
+</script>
+</body>
+</html>
